@@ -1,4 +1,3 @@
-
 import os
 from dotenv import load_dotenv
 
@@ -23,6 +22,16 @@ class Config:
     WARMUP_RATIO = float(os.getenv("WARMUP_RATIO", 0.1))
     SEED = int(os.getenv("SEED", 42))
 
+    # DoRA配置 (基于LoRA的改进版本)
+    DORA_R = int(os.getenv("DORA_R", 32))
+    DORA_ALPHA = int(os.getenv("DORA_ALPHA", 64))
+    DORA_DROPOUT = float(os.getenv("DORA_DROPOUT", 0.9))
+    DORA_TARGET_MODULES = os.getenv("DORA_TARGET_MODULES", "query,key,value,dense").split(",")
+    DORA_USE_MAGNITUDE = os.getenv("DORA_USE_MAGNITUDE", "true").lower() == "true"  # 是否使用幅度分解
+
+    # 设备配置
+    DEVICE = os.getenv("DEVICE", "cpu")
+
     # 输出路径
     OUTPUT_DIR_BASE = os.getenv("OUTPUT_DIR_BASE", "./results_19emo")
     FINAL_MODEL_DIR = os.getenv("FINAL_MODEL_DIR", "./emotion_model_19emo")
@@ -32,3 +41,13 @@ class Config:
     TARGET_EMOTIONS = os.getenv("TARGET_EMOTIONS", 
                                "高兴,平静,厌恶,害羞,害怕,生气,认真,紧张,慌张,疑惑,兴奋,无奈,担心,惊讶,哭泣,心动,难为情,自信,调皮").split(",")
     NUM_LABELS = len(TARGET_EMOTIONS)
+
+    @classmethod
+    def get_cpu_train_batch_size(cls):
+        """获取CPU训练的batch size"""
+        return cls.PER_DEVICE_TRAIN_BATCH_SIZE // 2
+
+    @classmethod
+    def get_cpu_eval_batch_size(cls):
+        """获取CPU评估的batch size"""
+        return cls.PER_DEVICE_EVAL_BATCH_SIZE // 2
