@@ -17,7 +17,7 @@ def main():
 
     if mode == "1":
         print("=== 19类情绪分类模型训练 ===")
-        # 1. 加载数据
+        # 1. 加载数据（使用预分割的train.csv和eval.csv）
         train_texts, test_texts, train_labels, test_labels, label_encoder = load_data()
 
         # 2. 训练和评估模型
@@ -32,38 +32,16 @@ def main():
     elif mode == "3":
         print("=== 情绪推理 ===")
         from inference.emotion_predictor import EmotionPredictor
-        from inference.config import InferenceConfig
-
-        # 初始化预测器
-        print(f"正在加载模型: {InferenceConfig.MODEL_DIR}")
-        predictor = EmotionPredictor(
-            model_dir=InferenceConfig.MODEL_DIR,
-            max_length=InferenceConfig.MAX_LENGTH
-        )
-
-        # 交互式推理
-        print("\n输入文本进行情绪预测（输入 'quit' 退出）")
+        predictor = EmotionPredictor()
         while True:
-            text = input("\n请输入文本: ").strip()
-            if text.lower() == "quit":
+            text = input("请输入要分析的文本（输入'quit'退出）: ").strip()
+            if text.lower() == 'quit':
                 break
-
-            if not text:
-                print("输入不能为空！")
-                continue
-
-            # 预测情绪
-            emotion = predictor.predict(text, return_top_k=1)
-            print(f"预测情绪: {emotion}")
-
-            # 可选：显示top-3结果
-            top_3 = predictor.predict(text, return_top_k=3)
-            print("Top-3 可能的情绪:")
-            for label, prob in top_3:
-                print(f"  {label}: {prob*100:.2f}%")
-
+            if text:
+                result = predictor.predict(text)
+                print(f"预测情绪: {result['emotion']}, 置信度: {result['confidence']:.4f}")
     else:
-        print("无效的模式选择！")
+        print("无效选择")
 
 if __name__ == "__main__":
     main()

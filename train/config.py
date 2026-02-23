@@ -10,6 +10,8 @@ class Config:
     # 数据配置
     DATA_DIR = os.getenv("DATA_DIR", "./data")
     DATA_PATH = os.getenv("DATA_PATH", "./data/emotion_data_manual.csv")
+    TRAIN_DATA_PATH = os.getenv("TRAIN_DATA_PATH", "./data/train.csv")
+    EVAL_DATA_PATH = os.getenv("EVAL_DATA_PATH", "./data/eval.csv")
 
     # 模型配置
     MODEL_NAME = os.getenv("MODEL_NAME", "bert-base-chinese")
