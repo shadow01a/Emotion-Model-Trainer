@@ -27,7 +27,7 @@ from .config import Config
 from .dataset import EmotionDataset
 
 def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label_encoder):
-    """训练和评估情绪分类模型 - 使用DoRA微调"""
+    """训练和评估情绪分类模型 - 使用DoRA+RSLora组合微调"""
     
     if not HAS_PEFT:
         raise ImportError("请先安装peft库: pip install peft")
@@ -41,23 +41,25 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
         label2id={label: i for i, label in enumerate(label_encoder.classes_)}
     )
 
-    # 2. 准备模型进行DoRA微调
-    print("\n准备模型进行DoRA微调...")
+    # 2. 准备模型进行微调
+    print("\n准备模型进行DoRA+RSLora组合微调...")
     model = prepare_model_for_kbit_training(model)
 
-    # 3. 配置DoRA参数 (基于LoRA的改进版本)
-    dora_config = LoraConfig(
-        r=Config.DORA_R,                    # DoRA秩
-        lora_alpha=Config.DORA_ALPHA,       # DoRA缩放因子
-        target_modules=Config.DORA_TARGET_MODULES,  # 目标模块
-        lora_dropout=Config.DORA_DROPOUT,   # Dropout概率
-        bias="none",                        # 不训练bias
-        task_type="SEQ_CLS",                # 序列分类任务
-        use_dora=Config.DORA_USE_MAGNITUDE  # 启用DoRA的幅度分解特性
+    # 3. 配置组合微调参数 (DoRA + RSLora)
+    # 使用RSLora的稳定缩放 + DoRA的幅度分解
+    combined_config = LoraConfig(
+        r=Config.RSLORA_R,                      # 使用RSLora的秩参数
+        lora_alpha=Config.RSLORA_ALPHA,         # 使用RSLora的缩放因子
+        target_modules=Config.RSLORA_TARGET_MODULES,  # 目标模块
+        lora_dropout=Config.RSLORA_DROPOUT,     # Dropout概率
+        bias="none",                            # 不训练bias
+        task_type="SEQ_CLS",                    # 序列分类任务
+        use_dora=Config.DORA_USE_MAGNITUDE,     # 启用DoRA的幅度分解特性
+        use_rslora=Config.USE_RSLORA            # 启用RSLora的秩稳定化
     )
 
-    # 4. 应用DoRA到模型
-    model = get_peft_model(model, dora_config)
+    # 4. 应用组合微调到模型
+    model = get_peft_model(model, combined_config)
     
     # 打印模型信息
     model.print_trainable_parameters()
@@ -87,7 +89,7 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
         num_train_epochs=Config.NUM_TRAIN_EPOCHS,
         per_device_train_batch_size=Config.get_cpu_train_batch_size(),  # 使用CPU优化的batch size
         per_device_eval_batch_size=Config.get_cpu_eval_batch_size(),    # 使用CPU优化的batch size
-        learning_rate=Config.LEARNING_RATE,  # DoRA可以使用标准学习率
+        learning_rate=Config.LEARNING_RATE,  # 组合微调可以使用标准学习率
         weight_decay=Config.WEIGHT_DECAY,
         warmup_ratio=Config.WARMUP_RATIO,
         eval_strategy="epoch",  # 修正参数名
@@ -137,10 +139,11 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
         compute_metrics=compute_metrics,
     )
 
-    print(f"\n开始DoRA训练...")
+    print(f"\n开始DoRA+RSLora组合训练...")
     print(f"训练设备: {Config.DEVICE}")
-    print(f"DoRA参数 - r: {Config.DORA_R}, alpha: {Config.DORA_ALPHA}, dropout: {Config.DORA_DROPOUT}")
-    print(f"使用幅度分解: {Config.DORA_USE_MAGNITUDE}")
+    print(f"RSLora参数 - r: {Config.RSLORA_R}, alpha: {Config.RSLORA_ALPHA}, dropout: {Config.RSLORA_DROPOUT}")
+    print(f"DoRA幅度分解: {Config.DORA_USE_MAGNITUDE}")
+    print(f"RSLora稳定化: {Config.USE_RSLORA}")
     print(f"训练batch size: {Config.get_cpu_train_batch_size()}")
     print(f"评估batch size: {Config.get_cpu_eval_batch_size()}")
     trainer.train()
@@ -176,16 +179,21 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
             "label2id": {label: i for i, label in enumerate(label_encoder.classes_)}
         }, f, ensure_ascii=False, indent=2)
 
-    # 保存DoRA配置
-    dora_config_path = os.path.join(Config.FINAL_MODEL_DIR, "dora_config.json")
-    print(f"保存DoRA配置到 {dora_config_path}...")
-    with open(dora_config_path, "w", encoding="utf-8") as f:
+    # 保存组合微调配置
+    combined_config_path = os.path.join(Config.FINAL_MODEL_DIR, "combined_finetune_config.json")
+    print(f"保存组合微调配置到 {combined_config_path}...")
+    with open(combined_config_path, "w", encoding="utf-8") as f:
         json.dump({
-            "r": Config.DORA_R,
-            "lora_alpha": Config.DORA_ALPHA,
-            "lora_dropout": Config.DORA_DROPOUT,
-            "target_modules": Config.DORA_TARGET_MODULES,
-            "use_dora": Config.DORA_USE_MAGNITUDE
+            "rslora_r": Config.RSLORA_R,
+            "rslora_alpha": Config.RSLORA_ALPHA,
+            "rslora_dropout": Config.RSLORA_DROPOUT,
+            "rslora_target_modules": Config.RSLORA_TARGET_MODULES,
+            "use_rslora": Config.USE_RSLORA,
+            "dora_use_magnitude": Config.DORA_USE_MAGNITUDE,
+            "dora_r": Config.DORA_R,
+            "dora_alpha": Config.DORA_ALPHA,
+            "dora_dropout": Config.DORA_DROPOUT,
+            "dora_target_modules": Config.DORA_TARGET_MODULES
         }, f, ensure_ascii=False, indent=2)
 
     print(f"\n模型和配置已保存到 {Config.FINAL_MODEL_DIR}")

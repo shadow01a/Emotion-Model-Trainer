@@ -29,6 +29,13 @@ class Config:
     DORA_TARGET_MODULES = os.getenv("DORA_TARGET_MODULES", "query,key,value,dense").split(",")
     DORA_USE_MAGNITUDE = os.getenv("DORA_USE_MAGNITUDE", "true").lower() == "true"  # 是否使用幅度分解
 
+    # RSLora配置 (Rank-Stabilized LoRA)
+    USE_RSLORA = os.getenv("USE_RSLORA", "true").lower() == "true"  # 是否使用RSLora
+    RSLORA_R = int(os.getenv("RSLORA_R", 16))  # RSLora秩参数
+    RSLORA_ALPHA = int(os.getenv("RSLORA_ALPHA", 32))  # RSLora缩放因子
+    RSLORA_DROPOUT = float(os.getenv("RSLORA_DROPOUT", 0.1))  # RSLora Dropout概率
+    RSLORA_TARGET_MODULES = os.getenv("RSLORA_TARGET_MODULES", "query,key,value,dense").split(",")
+
     # 设备配置
     DEVICE = os.getenv("DEVICE", "cpu")
 

@@ -1,10 +1,10 @@
 # 情绪分类模型训练项目
 
-本项目用于训练一个能够识别19+种不同情绪的文本分类模型，使用DoRA(Weight-Decomposed Low-Rank Adaptation)技术进行高效微调。
+本项目用于训练一个能够识别19+种不同情绪的文本分类模型，使用DoRA+RSLora组合微调技术进行高效参数优化。
 
 ## 项目特点
 
-- 🚀 使用DoRA技术进行参数高效微调（LoRA的改进版本）
+- 🚀 使用DoRA+RSLora组合微调技术（最先进的参数高效微调方法）
 - 💻 支持CPU训练模式
 - 🎯 19+种细粒度情绪识别
 - 📦 支持ONNX模型导出
@@ -51,11 +51,18 @@ pip install -r requirements.txt
 - `NUM_TRAIN_EPOCHS`: 训练轮数
 
 ### DoRA配置
-- `DORA_R=32`: DoRA秩参数
-- `DORA_ALPHA=64`: DoRA缩放因子
+- `DORA_R=8`: DoRA秩参数
+- `DORA_ALPHA=16`: DoRA缩放因子
 - `DORA_DROPOUT=0.9`: Dropout概率
 - `DORA_TARGET_MODULES`: 目标模块列表(query,key,value,dense)
 - `DORA_USE_MAGNITUDE=true`: 是否使用幅度分解（DoRA核心特性）
+
+### RSLora配置
+- `USE_RSLORA=true`: 是否启用RSLora稳定化
+- `RSLORA_R=16`: RSLora秩参数
+- `RSLORA_ALPHA=32`: RSLora缩放因子
+- `RSLORA_DROPOUT=0.1`: RSLora Dropout概率
+- `RSLORA_TARGET_MODULES`: RSLora目标模块列表
 
 ### 训练配置
 - `DEVICE=cpu`: 训练设备
@@ -100,10 +107,11 @@ python main.py
 18. 调皮
 19. 平静
 
-## DoRA微调优势
+## DoRA+RSLora组合微调优势
 
-相比传统的LoRA微调，DoRA具有以下优势：
+本项目采用先进的DoRA+RSLora组合微调技术，相比传统微调方法具有以下优势：
 
+### DoRA (Weight-Decomposed Low-Rank Adaptation) 优势
 - ✅ **参数效率**: 继承LoRA的低参数特性
 - ✅ **性能提升**: 通过权重分解获得更好的表达能力
 - ✅ **内存友好**: 显著减少GPU/CPU内存占用
@@ -111,33 +119,49 @@ python main.py
 - ✅ **幅度控制**: 独立控制权重的幅度和方向
 - ✅ **易于部署**: 支持合并到原模型中
 
-## DoRA vs LoRA
+### RSLora (Rank-Stabilized LoRA) 优势
+- ✅ **秩稳定性**: 通过数学稳定的缩放因子提升高秩适配器性能
+- ✅ **性能增强**: 在高秩设置下表现更佳
+- ✅ **收敛稳定**: 训练过程更加稳定
+- ✅ **参数优化**: 更好的参数利用率
 
-| 特性 | LoRA | DoRA |
-|------|------|------|
-| 参数效率 | ✅ 高效 | ✅ 高效 |
-| 权重表示 | 直接低秩适应 | 分解为幅度×方向 |
-| 表达能力 | 基础 | 更强 |
-| 实现复杂度 | 简单 | 中等 |
-| 性能表现 | 良好 | 更优 |
+### 组合优势
+- 🔥 **双重优化**: 同时享受DoRA和RSLora的技术优势
+- 🔥 **性能最大化**: 结合幅度分解和秩稳定化获得最佳效果
+- 🔥 **适应性强**: 可根据不同任务调整两种技术的参数
+- 🔥 **鲁棒性好**: 训练过程更加稳定可靠
+
+## 技术原理对比
+
+| 特性 | 传统LoRA | DoRA | RSLora | DoRA+RSLora |
+|------|----------|------|--------|-------------|
+| 缩放因子 | α/r | α/r (幅度分解) | α/√r | α/√r (幅度分解) |
+| 参数效率 | ✅ 高效 | ✅ 高效 | ✅ 高效 | ✅ 高效 |
+| 权重表示 | 直接低秩 | 幅度×方向 | 稳定缩放 | 幅度×方向+稳定缩放 |
+| 表达能力 | 基础 | 更强 | 更佳 | 最优 |
+| 稳定性 | 一般 | 良好 | 优秀 | 顶级 |
+| 实现复杂度 | 简单 | 中等 | 中等 | 较高 |
+| 性能表现 | 良好 | 更优 | 优异 | 卓越 |
 
 ## 模型输出
 
 训练完成后会生成以下文件：
-- `adapter_model.bin`: DoRA适配器权重
-- `adapter_config.json`: DoRA配置文件
+- `adapter_model.bin`: 组合微调适配器权重
+- `adapter_config.json`: 组合适配器配置文件
 - `config.json`: 模型配置
 - `pytorch_model.bin`: 合并后的完整模型权重
 - `tokenizer_config.json`: 分词器配置
 - `vocab.txt`: 词汇表
 - `label_mapping.json`: 标签映射文件
-- `dora_config.json`: DoRA参数配置
+- `combined_finetune_config.json`: 组合微调参数配置
 - `model.onnx`: ONNX格式模型
 
 ## 注意事项
 
 1. 确保数据文件格式正确
 2. 根据硬件条件调整batch size
-3. DoRA参数可根据具体任务进行调优
+3. 组合微调参数可根据具体任务进行调优
 4. 训练过程中会显示可训练参数统计信息
 5. `DORA_USE_MAGNITUDE=true`启用DoRA的核心特性
+6. `USE_RSLORA=true`启用RSLora的秩稳定化特性
+7. 建议先使用默认参数进行训练，再根据效果调整
