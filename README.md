@@ -50,19 +50,17 @@ pip install -r requirements.txt
 - `MAX_LENGTH`: 文本最大长度
 - `NUM_TRAIN_EPOCHS`: 训练轮数
 
+### LoRA基础配置
+- `LORA_R=8`: LoRA秩参数
+- `LORA_ALPHA=16`: LoRA缩放因子
+- `LORA_DROPOUT=0.1`: Dropout概率
+- `LORA_TARGET_MODULES`: 目标模块列表(query,key,value)
+
 ### DoRA配置
-- `DORA_R=8`: DoRA秩参数
-- `DORA_ALPHA=16`: DoRA缩放因子
-- `DORA_DROPOUT=0.9`: Dropout概率
-- `DORA_TARGET_MODULES`: 目标模块列表(query,key,value,dense)
 - `DORA_USE_MAGNITUDE=true`: 是否使用幅度分解（DoRA核心特性）
 
 ### RSLora配置
 - `USE_RSLORA=true`: 是否启用RSLora稳定化
-- `RSLORA_R=16`: RSLora秩参数
-- `RSLORA_ALPHA=32`: RSLora缩放因子
-- `RSLORA_DROPOUT=0.1`: RSLora Dropout概率
-- `RSLORA_TARGET_MODULES`: RSLora目标模块列表
 
 ### 训练配置
 - `DEVICE=cpu`: 训练设备

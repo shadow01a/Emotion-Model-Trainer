@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import os
 import json
-from typing import Dict, Any, cast
+from typing import Dict, Any, cast, Union
 from sklearn.metrics import classification_report
 from transformers import (
     BertTokenizer,
@@ -48,10 +48,10 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
     # 3. 配置组合微调参数 (DoRA + RSLora)
     # 使用RSLora的稳定缩放 + DoRA的幅度分解
     combined_config = LoraConfig(
-        r=Config.RSLORA_R,                      # 使用RSLora的秩参数
-        lora_alpha=Config.RSLORA_ALPHA,         # 使用RSLora的缩放因子
-        target_modules=Config.RSLORA_TARGET_MODULES,  # 目标模块
-        lora_dropout=Config.RSLORA_DROPOUT,     # Dropout概率
+        r=Config.LORA_R,                      # 使用统一的LoRA秩参数
+        lora_alpha=Config.LORA_ALPHA,         # 使用统一的LoRA缩放因子
+        target_modules=Config.LORA_TARGET_MODULES,  # 目标模块
+        lora_dropout=Config.LORA_DROPOUT,     # Dropout概率
         bias="none",                            # 不训练bias
         task_type="SEQ_CLS",                    # 序列分类任务
         use_dora=Config.DORA_USE_MAGNITUDE,     # 启用DoRA的幅度分解特性
@@ -83,12 +83,12 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
     train_dataset = EmotionDataset(train_encodings, train_labels)
     test_dataset = EmotionDataset(test_encodings, test_labels)
 
-    # 7. 训练配置 - CPU训练模式
+    # 7. 训练配置
     training_args = TrainingArguments(
         output_dir=Config.OUTPUT_DIR_BASE,
         num_train_epochs=Config.NUM_TRAIN_EPOCHS,
-        per_device_train_batch_size=Config.get_cpu_train_batch_size(),  # 使用CPU优化的batch size
-        per_device_eval_batch_size=Config.get_cpu_eval_batch_size(),    # 使用CPU优化的batch size
+        per_device_train_batch_size=Config.PER_DEVICE_TRAIN_BATCH_SIZE,
+        per_device_eval_batch_size=Config.PER_DEVICE_EVAL_BATCH_SIZE,
         learning_rate=Config.LEARNING_RATE,  # 组合微调可以使用标准学习率
         weight_decay=Config.WEIGHT_DECAY,
         warmup_ratio=Config.WARMUP_RATIO,
@@ -99,10 +99,10 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
         logging_dir=Config.LOGGING_DIR,
         logging_steps=50,
         seed=Config.SEED,
-        fp16=True,  # 强制禁用混合精度训练
+        fp16=torch.cuda.is_available(),  # 根据是否有CUDA可用决定是否启用混合精度
         report_to="none",
-        use_cpu=True,  # 强制使用CPU
-        dataloader_pin_memory=False,  # CPU训练不需要pin memory
+        use_cpu=Config.DEVICE.lower() == "cpu",  # 根据环境变量决定是否使用CPU
+        dataloader_pin_memory=Config.DEVICE.lower() != "cpu",  # CPU训练不需要pin memory
         remove_unused_columns=False,  # 保留所有列以避免数据处理问题
     )
 
@@ -141,11 +141,11 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
 
     print(f"\n开始DoRA+RSLora组合训练...")
     print(f"训练设备: {Config.DEVICE}")
-    print(f"RSLora参数 - r: {Config.RSLORA_R}, alpha: {Config.RSLORA_ALPHA}, dropout: {Config.RSLORA_DROPOUT}")
+    print(f"LoRA参数 - r: {Config.LORA_R}, alpha: {Config.LORA_ALPHA}, dropout: {Config.LORA_DROPOUT}")
     print(f"DoRA幅度分解: {Config.DORA_USE_MAGNITUDE}")
     print(f"RSLora稳定化: {Config.USE_RSLORA}")
-    print(f"训练batch size: {Config.get_cpu_train_batch_size()}")
-    print(f"评估batch size: {Config.get_cpu_eval_batch_size()}")
+    print(f"训练batch size: {Config.PER_DEVICE_TRAIN_BATCH_SIZE}")
+    print(f"评估batch size: {Config.PER_DEVICE_EVAL_BATCH_SIZE}")
     trainer.train()
 
     # 10. 最终评估
@@ -184,19 +184,15 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
     print(f"保存组合微调配置到 {combined_config_path}...")
     with open(combined_config_path, "w", encoding="utf-8") as f:
         json.dump({
-            "rslora_r": Config.RSLORA_R,
-            "rslora_alpha": Config.RSLORA_ALPHA,
-            "rslora_dropout": Config.RSLORA_DROPOUT,
-            "rslora_target_modules": Config.RSLORA_TARGET_MODULES,
+            "lora_r": Config.LORA_R,
+            "lora_alpha": Config.LORA_ALPHA,
+            "lora_dropout": Config.LORA_DROPOUT,
+            "lora_target_modules": Config.LORA_TARGET_MODULES,
             "use_rslora": Config.USE_RSLORA,
-            "dora_use_magnitude": Config.DORA_USE_MAGNITUDE,
-            "dora_r": Config.DORA_R,
-            "dora_alpha": Config.DORA_ALPHA,
-            "dora_dropout": Config.DORA_DROPOUT,
-            "dora_target_modules": Config.DORA_TARGET_MODULES
+            "dora_use_magnitude": Config.DORA_USE_MAGNITUDE
         }, f, ensure_ascii=False, indent=2)
 
     print(f"\n模型和配置已保存到 {Config.FINAL_MODEL_DIR}")
 
     from .onnx_exporter import convert_to_onnx
-    convert_to_onnx(Config.FINAL_MODEL_DIR, Config.FINAL_MODEL_DIR + "model.onnx", max_length=Config.MAX_LENGTH)
+    convert_to_onnx(Config.FINAL_MODEL_DIR, Config.FINAL_MODEL_DIR + "/model.onnx", max_length=Config.MAX_LENGTH)

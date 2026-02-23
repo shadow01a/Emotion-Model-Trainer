@@ -16,15 +16,15 @@ def convert_to_onnx(model_dir, output_path, max_length=128):
     print(f"[ONNX] 加载模型自: {model_dir}")
 
     try:
-        # 1. 加载模型和分词器 (使用 CPU 进行导出即可)
-        device = torch.device("cpu")
-        model = BertForSequenceClassification.from_pretrained(model_dir).to(device)
+        # 1. 加载模型和分词器 (使用 CPU 进行导出)
+        model = BertForSequenceClassification.from_pretrained(model_dir)
         model.eval()
+        model.cpu()
 
         # 2. 准备虚拟输入 (Dummy Input)
         # BERT 需要 input_ids 和 attention_mask
-        dummy_input_ids = torch.randint(0, 1000, (1, max_length), device=device)
-        dummy_attention_mask = torch.ones((1, max_length), device=device)
+        dummy_input_ids = torch.randint(0, 1000, (1, max_length))
+        dummy_attention_mask = torch.ones((1, max_length))
         
         # 将输入打包成 tuple
         dummy_inputs = (dummy_input_ids, dummy_attention_mask)
@@ -49,7 +49,7 @@ def convert_to_onnx(model_dir, output_path, max_length=128):
             input_names=input_names,
             output_names=output_names,
             dynamic_axes=dynamic_axes,
-            opset_version=17,  # 推荐使用较高的 opset 版本
+            opset_version=21,
             do_constant_folding=True
         )
         
