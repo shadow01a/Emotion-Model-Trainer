@@ -24,11 +24,15 @@ class Config:
     WARMUP_RATIO = float(os.getenv("WARMUP_RATIO", 0.1))
     SEED = int(os.getenv("SEED", 42))
 
-    # LoRA基础配置 (同时支持DoRA和RSLora)
+    # LoRA基础配置 (支持PiSSA、DoRA、RSLora组合)
     LORA_R = int(os.getenv("LORA_R", 8))
     LORA_ALPHA = int(os.getenv("LORA_ALPHA", 16))
     LORA_DROPOUT = float(os.getenv("LORA_DROPOUT", 0.1))
     LORA_TARGET_MODULES = os.getenv("LORA_TARGET_MODULES", "query,key,value").split(",")
+
+    # PiSSA配置
+    USE_PISSA = os.getenv("USE_PISSA", "false").lower() == "true"  # 是否使用PiSSA微调
+    PISSA_INIT_METHOD = os.getenv("PISSA_INIT_METHOD", "pissa_niter_4")  # PiSSA初始化方法: "pissa" 或 "pissa_niter_4"
 
     # DoRA配置 (基于LoRA的改进版本)
     DORA_USE_MAGNITUDE = os.getenv("DORA_USE_MAGNITUDE", "true").lower() == "true"  # 是否使用幅度分解
