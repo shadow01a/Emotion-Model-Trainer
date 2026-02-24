@@ -77,9 +77,9 @@ class EmotionPredictor:
             return_tensors="np"
         )
 
-        # 转换输入数据类型：input_ids保持int64，attention_mask转换为float32
+        # 转换输入数据类型：input_ids和attention_mask都保持int64类型
         input_ids = inputs["input_ids"].astype(np.int64)
-        attention_mask = inputs["attention_mask"].astype(np.float32)
+        attention_mask = inputs["attention_mask"].astype(np.int64)
 
         # 获取模型输出
         outputs = self.session.run(
@@ -126,9 +126,9 @@ class EmotionPredictor:
             return_tensors="np"
         )
 
-        # 转换输入数据类型：input_ids保持int64，attention_mask转换为float32
+        # 转换输入数据类型：input_ids和attention_mask都保持int64类型
         input_ids = inputs["input_ids"].astype(np.int64)
-        attention_mask = inputs["attention_mask"].astype(np.float32)
+        attention_mask = inputs["attention_mask"].astype(np.int64)
 
         # 获取模型输出
         outputs = self.session.run(

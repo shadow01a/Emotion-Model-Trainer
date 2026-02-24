@@ -2,6 +2,7 @@
 import torch
 import os
 from transformers import BertForSequenceClassification, BertTokenizer
+import json
 
 def convert_to_onnx(model_dir, output_path, max_length=128):
     """
@@ -16,31 +17,47 @@ def convert_to_onnx(model_dir, output_path, max_length=128):
     print(f"[ONNX] 加载模型自: {model_dir}")
 
     try:
-        # 1. 加载模型和分词器 (使用 CPU 进行导出)
-        model = BertForSequenceClassification.from_pretrained(model_dir)
+        # 1. 从 label_mapping.json 获取类别数量
+        label_mapping_path = os.path.join(model_dir, "label_mapping.json")
+        if os.path.exists(label_mapping_path):
+            with open(label_mapping_path, 'r', encoding='utf-8') as f:
+                label_mapping = json.load(f)
+                num_labels = len(label_mapping["id2label"])
+                print(f"[ONNX] 检测到 {num_labels} 个情绪类别")
+        else:
+            # 如果没有 label_mapping.json，使用默认值（但应该有）
+            num_labels = 19
+            print(f"[ONNX] 未找到 label_mapping.json，使用默认类别数: {num_labels}")
+
+        # 2. 加载模型和分词器 (使用 CPU 进行导出)
+        # 显式指定 num_labels 以确保正确的分类头维度
+        model = BertForSequenceClassification.from_pretrained(
+            model_dir, 
+            num_labels=num_labels
+        )
         model.eval()
         model.cpu()
 
-        # 2. 准备虚拟输入 (Dummy Input)
-        # BERT 需要 input_ids 和 attention_mask
-        dummy_input_ids = torch.randint(0, 1000, (1, max_length))
-        dummy_attention_mask = torch.ones((1, max_length))
+        # 3. 准备虚拟输入 (Dummy Input)
+        # BERT 需要 input_ids 和 attention_mask，确保正确的数据类型
+        dummy_input_ids = torch.randint(0, 1000, (1, max_length), dtype=torch.long)
+        dummy_attention_mask = torch.ones((1, max_length), dtype=torch.long)
         
         # 将输入打包成 tuple
         dummy_inputs = (dummy_input_ids, dummy_attention_mask)
 
-        # 3. 定义输入输出名称
+        # 4. 定义输入输出名称
         input_names = ["input_ids", "attention_mask"]
         output_names = ["logits"]
 
-        # 4. 定义动态轴 (允许 batch_size 变化)
+        # 5. 定义动态轴 (允许 batch_size 变化)
         dynamic_axes = {
             "input_ids": {0: "batch_size"},
             "attention_mask": {0: "batch_size"},
             "logits": {0: "batch_size"}
         }
 
-        # 5. 执行导出
+        # 6. 执行导出 - 禁用 Dynamo 以兼容 dynamic_axes
         print(f"[ONNX] 正在导出到: {output_path} ...")
         torch.onnx.export(
             model,
@@ -49,8 +66,9 @@ def convert_to_onnx(model_dir, output_path, max_length=128):
             input_names=input_names,
             output_names=output_names,
             dynamic_axes=dynamic_axes,
-            opset_version=21,
-            do_constant_folding=True
+            opset_version=20,
+            do_constant_folding=True,
+            dynamo=False  # 禁用 Dynamo 编译器以避免兼容性问题
         )
         
         print(f"[ONNX] 转换成功！模型已保存至: {output_path}")

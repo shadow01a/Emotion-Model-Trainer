@@ -32,9 +32,24 @@ def main():
 
     elif mode == "3":
         print("=== 情绪推理 ===")
-        from inference.emotion_predictor import EmotionPredictor
         from train.config import Config
-        predictor = EmotionPredictor(Config.FINAL_MODEL_DIR, Config.MAX_LENGTH)
+        
+        # 让用户选择推理方式
+        inference_mode = input("请选择推理方式 (1: ONNX推理, 2: 原始文件推理): ").strip()
+        
+        if inference_mode == "1":
+            print("=== 使用ONNX模型进行推理 ===")
+            from inference.emotion_predictor import EmotionPredictor
+            predictor = EmotionPredictor(Config.FINAL_MODEL_DIR, Config.MAX_LENGTH)
+        elif inference_mode == "2":
+            print("=== 使用原始模型文件进行推理 ===")
+            from inference.safetensors_predictor import SafetensorsPredictor
+            predictor = SafetensorsPredictor(Config.FINAL_MODEL_DIR, Config.MAX_LENGTH)
+        else:
+            print("无效选择，使用默认ONNX推理")
+            from inference.emotion_predictor import EmotionPredictor
+            predictor = EmotionPredictor(Config.FINAL_MODEL_DIR, Config.MAX_LENGTH)
+            
         while True:
             text = input("请输入要分析的文本（输入'quit'退出）: ").strip()
             if text.lower() == 'quit':
