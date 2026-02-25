@@ -39,9 +39,8 @@ def convert_to_onnx(model_dir, output_path, max_length=128):
         model.cpu()
 
         # 3. 准备虚拟输入 (Dummy Input)
-        # BERT 需要 input_ids 和 attention_mask，确保正确的数据类型
         dummy_input_ids = torch.randint(0, 1000, (1, max_length), dtype=torch.long)
-        dummy_attention_mask = torch.ones((1, max_length), dtype=torch.long)
+        dummy_attention_mask = torch.ones((1, max_length), dtype=torch.float32)
         
         # 将输入打包成 tuple
         dummy_inputs = (dummy_input_ids, dummy_attention_mask)
@@ -57,7 +56,7 @@ def convert_to_onnx(model_dir, output_path, max_length=128):
             "logits": {0: "batch_size"}
         }
 
-        # 6. 执行导出 - 禁用 Dynamo 以兼容 dynamic_axes
+        # 6. 执行导出
         print(f"[ONNX] 正在导出到: {output_path} ...")
         torch.onnx.export(
             model,

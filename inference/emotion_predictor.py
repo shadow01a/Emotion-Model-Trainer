@@ -1,4 +1,3 @@
-
 import os
 import json
 import numpy as np
@@ -77,9 +76,10 @@ class EmotionPredictor:
             return_tensors="np"
         )
 
-        # 转换输入数据类型：input_ids和attention_mask都保持int64类型
+        # 转换输入数据类型：根据ONNX模型的实际要求
+        # input_ids 需要 int64 类型，attention_mask 需要 float 类型
         input_ids = inputs["input_ids"].astype(np.int64)
-        attention_mask = inputs["attention_mask"].astype(np.int64)
+        attention_mask = inputs["attention_mask"].astype(np.float32)
 
         # 获取模型输出
         outputs = self.session.run(
@@ -108,6 +108,8 @@ class EmotionPredictor:
     def predict_batch(self, texts, return_top_k=1):
         """
         批量预测文本的情绪
+        
+        由于ONNX模型在批量处理时存在reshape问题，这里采用逐个预测的方式
 
         Args:
             texts (list[str]): 输入文本列表
@@ -117,45 +119,13 @@ class EmotionPredictor:
             如果return_top_k=1: 返回预测的情绪标签列表
             如果return_top_k>1: 返回前k个情绪标签及其概率的列表的列表
         """
-        # 文本预处理
-        inputs = self.tokenizer(
-            texts,
-            max_length=self.max_length,
-            padding="max_length",
-            truncation=True,
-            return_tensors="np"
-        )
-
-        # 转换输入数据类型：input_ids和attention_mask都保持int64类型
-        input_ids = inputs["input_ids"].astype(np.int64)
-        attention_mask = inputs["attention_mask"].astype(np.int64)
-
-        # 获取模型输出
-        outputs = self.session.run(
-            [self.output_name],
-            {
-                self.input_name: input_ids,
-                self.attention_mask_name: attention_mask
-            }
-        )
-
-        # 计算概率
-        logits = outputs[0]  # shape: (batch_size, num_labels)
-        probabilities = self._softmax(logits, axis=1)
-
-        # 获取top-k结果
-        top_k_indices = np.argsort(probabilities, axis=1)[:, ::-1][:, :return_top_k]
-
-        if return_top_k == 1:
-            return [self.id2label[str(idx[0])] for idx in top_k_indices]
-        else:
-            return [
-                [
-                    (self.id2label[str(idx)], float(probabilities[i][idx]))
-                    for idx in top_k_indices[i]
-                ]
-                for i in range(len(texts))
-            ]
+        # 逐个预测以避免ONNX模型的批量处理问题
+        results = []
+        for text in texts:
+            result = self.predict(text, return_top_k)
+            results.append(result)
+        
+        return results
 
     @staticmethod
     def _softmax(x, axis=None):

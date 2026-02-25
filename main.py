@@ -9,7 +9,7 @@ def main():
     print("=== 情绪分类系统 ===")
 
     # 选择运行模式
-    mode = input("请选择模式 (1: 训练, 2: 导出ONNX, 3: 推理): ").strip()
+    mode = input("请选择模式 (1: 训练, 2: 导出ONNX, 3: 推理, 4: 评测): ").strip()
 
     if mode == "1":
         # 延迟导入
@@ -59,6 +59,39 @@ def main():
                 print(f"预测结果:")
                 for i, (emotion, confidence) in enumerate(result):
                     print(f"  {i+1}. {emotion}: {confidence:.4f}")
+    elif mode == "4":
+        print("=== 模型评测 ===")
+        from train.evaluate_model import evaluate
+        from train.config import Config
+
+        # 选择评测方式
+        eval_mode = input("请选择评测方式 (1: ONNX 评测, 2: 原始模型评测): ").strip()
+        use_onnx = (eval_mode == "1")
+
+        if eval_mode not in ["1", "2"]:
+            print("无效选择，使用默认 ONNX 评测")
+            use_onnx = True
+
+        try:
+            # 执行评测
+            results = evaluate(
+                model_dir=Config.FINAL_MODEL_DIR,
+                eval_data_path=Config.EVAL_DATA_PATH,
+                use_onnx=use_onnx,
+                max_length=Config.MAX_LENGTH
+            )
+
+            print(f"\n=== 评测完成 ===")
+            print(f"准确率: {results['accuracy']:.4f}")
+            print(f"宏平均 F1: {results['macro_f1']:.4f}")
+            print(f"加权平均 F1: {results['weighted_f1']:.4f}")
+            print(f"评测样本数: {results['valid_num_samples']} (原始: {results['original_num_samples']})")
+
+        except Exception as e:
+            print(f"评测过程中出现错误: {e}")
+            import traceback
+            traceback.print_exc()
+
     else:
         print("无效选择")
 
