@@ -40,6 +40,9 @@ class Config:
     # RSLora配置 (Rank-Stabilized LoRA)
     USE_RSLORA = os.getenv("USE_RSLORA", "true").lower() == "true"  # 是否使用RSLora
     
+    # NEFTune配置
+    USE_NEFTUNE = os.getenv("USE_NEFTUNE", "false").lower() == "true"  # 是否使用NEFTune
+    NEFTUNE_NOISE_ALPHA = float(os.getenv("NEFTUNE_NOISE_ALPHA", 5.0))  # NEFTune噪声强度
 
     # 设备配置
     DEVICE = os.getenv("DEVICE", "cpu")

@@ -48,6 +48,10 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
     if not config_parts:
         config_parts.append("LoRA")
     
+    # 添加NEFTune到配置名称（如果启用）
+    if Config.USE_NEFTUNE:
+        config_parts.append("NEFTune")
+    
     config_name = "+".join(config_parts)
     
     # 创建LoraConfig参数字典
@@ -103,26 +107,32 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
     warmup_steps = int(Config.WARMUP_RATIO * total_train_steps)
 
     # 7. 训练配置
-    training_args = TrainingArguments(
-        output_dir=Config.OUTPUT_DIR_BASE,
-        num_train_epochs=Config.NUM_TRAIN_EPOCHS,
-        per_device_train_batch_size=Config.PER_DEVICE_TRAIN_BATCH_SIZE,
-        per_device_eval_batch_size=Config.PER_DEVICE_EVAL_BATCH_SIZE,
-        learning_rate=Config.LEARNING_RATE,
-        weight_decay=Config.WEIGHT_DECAY,
-        warmup_steps=warmup_steps,  # 替换warmup_ratio
-        eval_strategy="epoch",
-        save_strategy="epoch",
-        load_best_model_at_end=True,
-        metric_for_best_model="f1_weighted",
-        logging_steps=50,
-        seed=Config.SEED,
-        fp16=torch.cuda.is_available(),
-        report_to="none",
-        use_cpu=Config.DEVICE.lower() == "cpu",
-        dataloader_pin_memory=Config.DEVICE.lower() != "cpu",
-        remove_unused_columns=False,
-    )
+    training_args_kwargs = {
+        "output_dir": Config.OUTPUT_DIR_BASE,
+        "num_train_epochs": Config.NUM_TRAIN_EPOCHS,
+        "per_device_train_batch_size": Config.PER_DEVICE_TRAIN_BATCH_SIZE,
+        "per_device_eval_batch_size": Config.PER_DEVICE_EVAL_BATCH_SIZE,
+        "learning_rate": Config.LEARNING_RATE,
+        "weight_decay": Config.WEIGHT_DECAY,
+        "warmup_steps": warmup_steps,  # 替换warmup_ratio
+        "eval_strategy": "epoch",
+        "save_strategy": "epoch",
+        "load_best_model_at_end": True,
+        "metric_for_best_model": "f1_weighted",
+        "logging_steps": 50,
+        "seed": Config.SEED,
+        "fp16": torch.cuda.is_available(),
+        "report_to": "none",
+        "use_cpu": Config.DEVICE.lower() == "cpu",
+        "dataloader_pin_memory": Config.DEVICE.lower() != "cpu",
+        "remove_unused_columns": False,
+    }
+    
+    # 添加NEFTune配置（如果启用）
+    if Config.USE_NEFTUNE:
+        training_args_kwargs["neftune_noise_alpha"] = Config.NEFTUNE_NOISE_ALPHA
+    
+    training_args = TrainingArguments(**training_args_kwargs)
 
     # 8. 自定义评估指标
     def compute_metrics(pred) -> Dict[str, float]:
@@ -164,6 +174,8 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
         print(f"PiSSA初始化方法: {Config.PISSA_INIT_METHOD}")
     print(f"DoRA幅度分解: {Config.DORA_USE_MAGNITUDE}")
     print(f"RSLora稳定化: {Config.USE_RSLORA}")
+    if Config.USE_NEFTUNE:
+        print(f"NEFTune噪声强度: {Config.NEFTUNE_NOISE_ALPHA}")
     print(f"训练batch size: {Config.PER_DEVICE_TRAIN_BATCH_SIZE}")
     print(f"评估batch size: {Config.PER_DEVICE_EVAL_BATCH_SIZE}")
     print(f"Warmup steps: {warmup_steps}")  # 添加warmup_steps信息
@@ -232,7 +244,9 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
         "use_pissa": use_pissa,
         "pissa_init_method": Config.PISSA_INIT_METHOD if use_pissa else None,
         "use_dora": Config.DORA_USE_MAGNITUDE,
-        "use_rslora": Config.USE_RSLORA
+        "use_rslora": Config.USE_RSLORA,
+        "use_neftune": Config.USE_NEFTUNE,
+        "neftune_noise_alpha": Config.NEFTUNE_NOISE_ALPHA if Config.USE_NEFTUNE else None
     }
     
     print(f"保存组合微调配置到 {finetune_config_path}...")
