@@ -1,9 +1,7 @@
 import torch
-import numpy as np
 import os
 import json
 from typing import Dict, Any
-from sklearn.metrics import classification_report
 from transformers import (
     BertTokenizer,
     BertForSequenceClassification,
@@ -17,6 +15,7 @@ from peft import (
 )
 from .config import Config
 from .dataset import EmotionDataset
+from .evaluator import Evaluator
 
 def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label_encoder):
     """训练和评估情绪分类模型 - 支持PiSSA、DoRA、RSLora三种方法的组合微调"""
@@ -182,20 +181,8 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
     trainer.train()
 
     # 10. 最终评估
-    print("\n=== 测试集最终性能 (使用最佳模型) ===")
-    eval_results = trainer.evaluate(test_dataset)
-    print(f"评估结果: {eval_results}")
-
-    # 获取详细的分类报告
-    print("\n详细分类报告:")
-    predictions = trainer.predict(test_dataset)
-    y_pred = np.argmax(predictions.predictions, axis=1)
-    print(classification_report(
-        test_labels,
-        y_pred,
-        target_names=label_encoder.classes_,
-        digits=4
-    ))
+    evaluator = Evaluator(trainer, label_encoder)
+    evaluator.evaluate(test_dataset, test_labels)
 
     # 11. 保存模型和配置
     os.makedirs(Config.FINAL_MODEL_DIR, exist_ok=True)
