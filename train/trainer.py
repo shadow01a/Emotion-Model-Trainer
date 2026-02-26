@@ -1,4 +1,3 @@
-
 import torch
 import numpy as np
 import os
@@ -51,12 +50,11 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
         per_device_eval_batch_size=Config.PER_DEVICE_EVAL_BATCH_SIZE,
         learning_rate=Config.LEARNING_RATE,
         weight_decay=Config.WEIGHT_DECAY,
-        warmup_ratio=Config.WARMUP_RATIO,
+        warmup_steps=Config.WARMUP_STEPS,
         eval_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
         metric_for_best_model="f1_weighted",
-        logging_dir=Config.LOGGING_DIR,
         logging_steps=50,
         seed=Config.SEED,
         fp16=torch.cuda.is_available(),
@@ -73,11 +71,20 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
             output_dict=True,
             zero_division=0
         )
+        # report 是字典类型，包含accuracy和各类别的统计信息
+        # 使用类型转换确保安全访问
+        report_dict = dict(report) if isinstance(report, dict) else {}
+        accuracy = report_dict.get("accuracy", 0.0)
+        weighted_avg = report_dict.get("weighted avg", {})
+        f1_score = weighted_avg.get("f1-score", 0.0)
+        precision = weighted_avg.get("precision", 0.0)
+        recall = weighted_avg.get("recall", 0.0)
+        
         return {
-            "accuracy": report["accuracy"],
-            "f1_weighted": report["weighted avg"]["f1-score"],
-            "precision_weighted": report["weighted avg"]["precision"],
-            "recall_weighted": report["weighted avg"]["recall"],
+            "accuracy": float(accuracy),
+            "f1_weighted": float(f1_score),
+            "precision_weighted": float(precision),
+            "recall_weighted": float(recall),
         }
 
     # 6. 训练
@@ -105,7 +112,8 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
         test_labels,
         y_pred,
         target_names=label_encoder.classes_,
-        digits=4
+        digits=4,
+        zero_division=0
     ))
 
     # 8. 保存模型和配置
@@ -122,6 +130,38 @@ def train_and_evaluate(train_texts, test_texts, train_labels, test_labels, label
             "id2label": {str(i): label for i, label in enumerate(label_encoder.classes_)},
             "label2id": {label: i for i, label in enumerate(label_encoder.classes_)}
         }, f, ensure_ascii=False, indent=2)
+
+    # 保存训练配置
+    training_config_path = os.path.join(Config.FINAL_MODEL_DIR, "training_config.json")
+    print(f"保存训练配置到 {training_config_path}...")
+    training_config = {
+        "data_config": {
+            "DATA_DIR": Config.DATA_DIR,
+            "DATA_PATH": Config.DATA_PATH
+        },
+        "model_config": {
+            "MODEL_NAME": Config.MODEL_NAME,
+            "MAX_LENGTH": Config.MAX_LENGTH,
+            "NUM_LABELS": Config.NUM_LABELS,
+            "TARGET_EMOTIONS": Config.TARGET_EMOTIONS
+        },
+        "training_config": {
+            "NUM_TRAIN_EPOCHS": Config.NUM_TRAIN_EPOCHS,
+            "PER_DEVICE_TRAIN_BATCH_SIZE": Config.PER_DEVICE_TRAIN_BATCH_SIZE,
+            "PER_DEVICE_EVAL_BATCH_SIZE": Config.PER_DEVICE_EVAL_BATCH_SIZE,
+            "LEARNING_RATE": Config.LEARNING_RATE,
+            "WEIGHT_DECAY": Config.WEIGHT_DECAY,
+            "WARMUP_STEPS": Config.WARMUP_STEPS,
+            "SEED": Config.SEED
+        },
+        "output_config": {
+            "OUTPUT_DIR_BASE": Config.OUTPUT_DIR_BASE,
+            "FINAL_MODEL_DIR": Config.FINAL_MODEL_DIR,
+            "LOGGING_DIR": Config.LOGGING_DIR
+        }
+    }
+    with open(training_config_path, "w", encoding="utf-8") as f:
+        json.dump(training_config, f, ensure_ascii=False, indent=2)
 
     print(f"\n模型和配置已保存到 {Config.FINAL_MODEL_DIR}")
 
